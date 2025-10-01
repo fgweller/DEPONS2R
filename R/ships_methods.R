@@ -4,17 +4,17 @@
 #' @description Objects containing ship routes and ships
 #' @description Methods for manipulating, plotting and analyzing ship routes
 #' and ship agents used in DEPONS simulations.
-#' @slot title Name of the object (character)
-#' @slot landscape Name of the landscape that the ships occur in (character)
+#' @slot title Character. Name of the object
+#' @slot landscape Character. Name of the landscape that the ships occur in
 #' @slot crs CRS object providing the coordinate reference system used; see
 #' \code{\link[sp]{CRS}} for details
-#' @slot routes \code{data.frame} geographic positions of the 'virtual buoys'
+#' @slot routes \code{data.frame}. Geographic positions of the 'virtual buoys'
 #' that define one or more ship routes that ship agents follow, and the speed
 #' that the ships should use when following this route. They also provide
 #' information about how long ships should use speed zero when reaching a
 #' specific buoy ('i.e. 'pause', measured in minutes). Can be extracted
 #' using the \code{\link{routes}} function.
-#' @slot ships \code{data.frame} defining each of the ships occurring in DEPONS
+#' @slot ships \code{data.frame}. Defines each of the ships occurring in DEPONS
 #' simulations, and the routes they occur on. The data frame includes the variables
 #' 'name', 'type', 'length', and 'route'. Info can be extracted using the
 #' \code{\link{ships}} function.
@@ -53,7 +53,7 @@ setMethod("initialize", "DeponsShips",
 #' minutes. The first and last position in the original track are omitted
 #' unless minutes = 0 or 30 and seconds = 0.
 #' @param aisdata Data frame including the columns 'id' (ship identifier),
-#' 'time' (text string readable by \code{\link{as.POSIXct}}), 'x' and 'y'
+#' 'time' (character string of the form 'yyyy-mm-dd hh:mm:ss'), 'x' and 'y'
 #' (recorded ship position, unit: meters), and potentially additional columns
 #' @return Returns a data frame with the same columns as the input data. Tracks
 #' that are too short to interpolate are omitted (with a warning)
@@ -498,7 +498,7 @@ setGeneric("ships", function(x, value) {
 #' @aliases ships,DeponsShips-method
 #' @aliases ships<-,DeponsShips-method
 #' @param x Object of class \code{DeponsShips}
-#' @param value data frame with the 'name', 'type', 'length', and 'route' of
+#' @param value Data frame with the 'name', 'type', 'length', and 'route' of
 #' ships to be simulated, as well as 'tickStart' and 'tickEnd' defining when
 #' the ships are to be included in simulations. 'route' is one of the shipping
 #' routes defined in the DeponsShips object.
@@ -556,7 +556,7 @@ setGeneric("routes", function(x) {
 #' @aliases routes<-,DeponsShips-method
 #' @aliases routes<-
 #' @param x Object of class \code{DeponsShips}
-#' @param value list with one named element per shipping route. Each element is
+#' @param value List with one named element per shipping route. Each element is
 #' a data frame with the variables x, y, speed, and 'pause' which define the
 #' coordinates of the fix-points on the shipping routes and the speeds that ships
 #' have after passing the fix point and until reaching the next fix point. The
@@ -608,43 +608,69 @@ setMethod("routes<-", signature=("DeponsShips"), function(x, value) {
 #' object. If the AIS data does not include ship positions recorded in half-hour
 #' steps, the tracks are interpolated to make objects suitable for use in DEPONS.
 #' @param data data.frame with ship positions and the times at which the
-#' positions were recorded. Must contain the columns 'id', 'time' (of the form
-#' "%Y-%m-%d %H:%M:%S", character, see \code{\link{as.POSIXct}}), 'type' (ship
-#' type, character), 'length' (ship length, meters), 'x', and 'y' (position,
-#' meters/UTM).
+#' positions were recorded. Must contain the columns ’id’ (character), ’time’
+#' (character string of the form 'yyyy-mm-dd hh:mm:ss'), 'type' (character), ’length’
+#' (ship length; meters, numeric), ’x’, and ’y’ (position; meters/UTM, numeric).
+#' 'type' must correspond to one of the vessel classes from Table 1 in MacGillivray &
+#' de Jong (2021). The user may instead provide numerical AIS vessel type codes here
+#' and later convert these into the recognized ship types in the DeponsShips object
+#' using \code{\link{set.ship.types}}.
 #' @param landsc A \code{DeponsRaster} object corresponding to the
 #' landscape that the ships move in. It is assumed that the spatial projection
 #' of the ship positions corresponds to that of the DeponsRaster object
 #' @param title Title of the output object
 #' @param ... Optional parameters, including 'startday' and 'endday'
-#' ("%Y-%m-%d %H:%M:%S", character) for defining the first and last date to use
+#' (character string of the form 'yyyy-mm-dd') for defining the first and last date to use
 #' from 'data'. If startday = endday the output object will contain up to
 #' 49 positions from the selected date for each vessel track.
-#' @return Returns a \code{DeponsShips} object containing one or more ships
-#' assigned to each of the routes in the object. All ships on a particular
-#' route move at the same speed along the route. The routes are
-#' defined by x and y coordinates based on the same coordinate reference
+#' @return A \code{DeponsShips} object containing one or more ships
+#' assigned to each of the routes in the object. The routes contain information about the number of half-hour
+#' intervals were ships 'pause' at a particular location without noise emission,
+#' e.g. in a port. These are calculated based on the input AIS data.
+#' @details All ships on a particular route move at the same speed along the route.
+#' The routes are defined by x and y coordinates based on the same coordinate reference
 #' system as the landscape they are located in. The speed that ships use after
 #' reaching a particular position (a particular 'virtual buoy') is calculated
 #' from the distance to the following position, and the time it takes reaching
-#' that position. If speed is included in the input AIS data, this is NOT used.
+#' that position. Any speed data provided in the input are ignored.
 #' The routes include one position per half-hour time step, corresponding to
 #' the default time step used in the DEPONS model. If input data does not
 #' include one position per half hour, new positions are generated using linear
 #' interpolation. If the input data contains many positions in a particular
 #' half-hour interval, only the positions closest to the half-hour interval are
-#' used. The routes contain information about the number of half-hour
-#' intervals were ships 'pause' at a particular location, e.g. in a
-#' port. These are calculated based on the input AIS data.
+#' used.
+#'
+#' Either both or neither of 'startday' and 'endday' must be provided. If these
+#' dates are given, ship routes that do not span the full duration will be buffered
+#' with pauses from and to the start and end dates, and all routes will be recycled
+#' when 'endday' is reached. If the dates are not given, routes will not be buffered,
+#' all routes will start on the first tick of the simulation, and each route will be
+#' recycled individually when it reaches its last position.
+#'
+#' Individual routes that are too short to integrate (< 30 min duration) will be shown
+#' in console and omitted from the created DeponsShips object.
+#'
+#' Note that DEPONS assumes months of 31 days for January and March, 28 days for February,
+#' and 30 days for all other months. Entries with the following dates are omitted when the
+#' data are processed, and the dates cannot be used as 'startday' or 'endday':
+#' February 29, and May/June/July/October/December 31.
+#' @section References:
+#' MacGillivray, A., & de Jong, C (2021). A reference spectrum model for estimating source
+#' levels of marine shipping based on Automated Identification System data. Journal of
+#' Marine Science and Engineering, 9(4), 369. doi:10.3390/jmse9040369
 #' @seealso \code{\link{aisdata}} for an example of data that can be used as
 #' input to ais.to.DeponsShips. The function builds on
 #' \code{\link{interpolate.ais.data}}, which interpolates tracks to ensure
-#' that there is a position every 30 minutes. Use \code{\link{check.DeponsShips}}
-#' for testing if speeds are realistic.
+#' that there is a position every 30 minutes.
 #' See \code{\link[DEPONS2R]{write.DeponsShips}} for conversion of
 #' \code{DeponsShips} objects to json-files to be used in DEPONS. Use
 #' \code{\link{routes}}, \code{\link{ships}}, and \code{\link{title}} for
 #' inspection/modification of the ship tracks.
+#' See \code{\link{check.DeponsShips}} for testing if speeds are realistic.
+#' See \code{\link{set.ship.types}} to convert numerical AIS vessel identifiers into recognized
+#' ship types, if these have not yet been provided here.
+#' See \code{\link{make.stationary.ships}} for augmenting existing DeponsShips objects with
+#' information on stationary but active ships (e.g. bollard pushing, dynamic positioning systems).
 #' @examples
 #' data(aisdata)
 #' plot(aisdata$x, aisdata$y, type="n", asp=1)
@@ -1516,7 +1542,7 @@ make.stationary.ships <- function(x,
 # end of 'make.stationary.ships'
 
 
-                                                               
+
 #' @title Generate artificial AIS data representing ship traffic during wind farm construction
 #' @name make.construction.traffic
 #' @description Generates artificial Automatic Identification System (AIS) data to represent ship traffic connected with the construction
@@ -1579,11 +1605,11 @@ make.stationary.ships <- function(x,
 #'
 #' One or more principal construction ships may be intended to remain within the piling area for the entire duration of piling operations without returning to harbour.
 #' This is achieved by setting the ship's 'daily.pause' duration in the 'ships' dataframe to a high number of ticks (greater than the longest gap between pilings,
-#' e.g. multiple days of 48 ticks each), which will cause the ship to progress directly from one piling to the next. This value will be capped at 48 ticks before the first 
-#' and after the last piling event. Note that all this time spent pausing at sea will be parameterized as an active (noisy) pause when the generated ship data set is later 
-#' processed with \code{\link{make.stationary.ships}}. This may be correct for crane ships or similar that actively hold position at sea, but inappropriate for jack-up vessels
-#' that take up a fixed position at the piling. In the latter case, the user should make note of the ship's identifier, and after carrying out the 'check' step of processing 
-#' with 'make.stationary.ships', remove all of the ship's entries from the candidates data frame before carrying out the 'replace' step (see \code{\link{make.stationary.ships}} for details).
+#' e.g. multiple days of 48 ticks each), which will cause the ship to progress directly from one piling to the next. Note that all this time spent pausing at sea will be
+#' parameterized as an active (noisy) pause when the generated ship data set is later processed with \code{\link{make.stationary.ships}}. This may be correct for crane
+#' ships or similar that actively hold position at sea, but inappropriate for jack-up vessels that take up a fixed position at the piling. In the latter case, the user
+#' should make note of the ship's identifier, and after carrying out the 'check' step of processing with 'make.stationary.ships', remove all of the ship's entries from the
+#' candidates data frame before carrying out the 'replace' step (see \code{\link{make.stationary.ships}} for details).
 #'
 #' @param pilings A data frame containing the positions and times of piling operations during the construction of a wind farm.
 #' May contain real data but must be in the format as produced by \code{\link{make.windfarms}}: columns 'id', 'x.coordinate' (num),
@@ -1682,12 +1708,10 @@ make.construction.traffic <- function (pilings, ships = NULL, x.harbour, y.harbo
       movtim <- round((movdist / (ships$speed[ship] * 1852)) * 2) # time in ticks required to cover distance at ship's speed
 
       # first movement out to piling. Add startpos (~postmid) (on conversion by ais.to.Deponsships, this pos will be pause-buffered backwards to start of file) and first prepil
-      # note that max length of first pause is limited to 1 day (48 ticks) to take into account ships that were intended to remain at sea,
-      # and thus have intentionally exaggerated pause durations
       if (piling == 1) {
-        time.postmid <- pilings$middle.tick[piling] - movtim - min(ceiling(ships$pause.length[ship] / 2), 48)
+        time.postmid <- pilings$middle.tick[piling] - movtim - ceiling(ships$pause.length[ship] / 2)
         pos.postmid <- harbour
-        time.prepil <- pilings$middle.tick[piling] - min(ceiling(ships$pause.length[ship] / 2), 48)
+        time.prepil <- pilings$middle.tick[piling] - ceiling(ships$pause.length[ship] / 2)
         pos.prepil <- c(pilings$x.coordinate[piling], pilings$y.coordinate[piling])
         ship.templates[[ship]] <- rbind(ship.templates[[ship]],
                                         c(ships$id[ship], time.postmid, "Other", ships$length[ship], round(pos.postmid[1]), round(pos.postmid[2])),
@@ -1784,8 +1808,9 @@ make.construction.traffic <- function (pilings, ships = NULL, x.harbour, y.harbo
   construction.ships[,c(4:6)] <- as.numeric(unlist(construction.ships[,c(4:6)]))
   return(construction.ships)
 }
-                                                               
-                                                               
+
+
+
 
 #' @title Convert AIS vessel type identifiers into the ship types recognized by DEPONS
 #' @name set.ship.type
@@ -1883,7 +1908,7 @@ set.ship.type <- function(data, list.ur = FALSE) {
   return(data)
 }
 
-                                                               
+
 
 #' Ships on example routes through the Kattegat
 #'
